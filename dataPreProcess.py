@@ -27,10 +27,8 @@ class dataPreProcess:
 
         return X, y
 
-    
-    def stratify(X, y, regression=False, tuningParition=True, tuningArray=None):
 
-        tuningArray
+    def stratify(X, y, regression=False, tuningParition=True, tuningArray=None):
 
         if(tuningParition):
             np.array_split(X,10)                                     # evenly splits the data into ten partitions (1 less normal partition for tuning partition)
@@ -39,4 +37,3 @@ class dataPreProcess:
         else:
             np.array_split(X,10)                                     # evenly splits the data into ten partitions
             np.array_split(y,10)
-    

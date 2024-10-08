@@ -5,7 +5,7 @@ t = pd.read_csv(r"C:\Users\tyler\OneDrive\Documents\GitHub\MachineLearningKNeare
 print(t)
 
 for row, element in enumerate(t.iloc[0]):
-            if(isinstance(element, str)):
-                t[row] = pd.factorize(t[row])[0]
+    if(isinstance(element, str)):
+        t[row] = pd.factorize(t[row])[0]
 
 print(t)
