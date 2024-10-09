@@ -1,166 +1,102 @@
 import numpy as np
-import math
-from collections import Counter
-from math import sqrt
 
-# Distance calculation (Euclidean)
-def euclidean_distance(x1, x2):
-    return sqrt(np.sum((np.array(x1) - np.array(x2))**2))
 
-# k-NN algorithm implementation
-class KNN:
-    def __init__(self, k=3):
-        self.k = k
+def euclidean_distance_optimized(X_train, X_test):
+    """
+    Vectorized computation of Euclidean distances between training and test points.
+    """
+    distances = np.sqrt(np.sum((X_train[:, np.newaxis] - X_test) ** 2, axis=2))
+    return distances
 
-    def fit(self, X_train, y_train):
-        self.X_train = X_train
-        self.y_train = y_train
 
-    def predict(self, X_test, task="classification"):
-        predictions = [self._predict(x, task) for x in X_test]
-        return np.array(predictions)
+def k_nearest_neighbors(X_train, y_train, X_test, k, regression=False, sigma=None):
+    """
+    Optimized k-NN classifier/regressor for a given test set, using vectorized distance calculation.
+    """
+    # Ensure sigma is not None for regression
+    if regression and sigma is None:
+        sigma = 1.0  # Set a default value for sigma
 
-    def _predict(self, x, task):
-        # Compute distances between x and all examples in the training set
-        distances = [euclidean_distance(x, x_train) for x_train in self.X_train]
-        # Get the nearest neighbors
-        k_indices = np.argsort(distances)[:self.k]
-        k_nearest_labels = [self.y_train[i] for i in k_indices]
+    predictions = []
 
-        if task == "classification":
-            # Return the most common class label (classification)
-            return Counter(k_nearest_labels).most_common(1)[0][0]
+    # Vectorized distance calculation
+    distances = euclidean_distance_optimized(X_train, X_test)
+
+    for i in range(len(X_test)):
+        # Get distances for the current test point
+        current_distances = distances[:, i]
+
+        # Sort by distance and get the k nearest neighbors
+        nearest_indices = np.argsort(current_distances)[:k]
+        neighbors = y_train[nearest_indices]
+
+        if regression:
+            weights = np.exp(-current_distances[nearest_indices]**2 / (2 * sigma**2))
+            weighted_avg = np.dot(weights, neighbors) / np.sum(weights)
+            predictions.append(weighted_avg)
         else:
-            # Return the average of k neighbors (regression)
-            return np.mean(k_nearest_labels)
+            # Majority voting for classification
+            prediction = max(set(neighbors), key=list(neighbors).count)
+            predictions.append(prediction)
+
+    return np.array(predictions)
 
 
-class EditedKNN(KNN):
-    def __init__(self, k=3, threshold=0.1):
-        super().__init__(k)
-        self.threshold = threshold
+def edited_knn(X_train, y_train, k, regression=False, error_threshold=None):
+    """
+    Edited k-NN, which removes misclassified points from the training set.
+    For regression, it uses an error threshold to define if a prediction is incorrect.
+    """
+    edited_X, edited_y = [], []
 
-    def fit(self, X_train, y_train):
-        self.X_train = X_train
-        self.y_train = y_train
+    # Ensure a default error_threshold is provided if missing during regression
+    if regression and error_threshold is None:
+        error_threshold = 0.1  # Default error threshold for regression
 
-        # Remove noisy examples based on threshold
-        self.X_train, self.y_train = self._edit_examples(self.X_train, self.y_train)
+    for i in range(len(X_train)):
+        # Leave one out and test on the ith point
+        X_edited = np.concatenate((X_train[:i], X_train[i+1:]), axis=0)
+        y_edited = np.concatenate((y_train[:i], y_train[i+1:]), axis=0)
 
-    def _edit_examples(self, X_train, y_train):
-        X_cleaned = []
-        y_cleaned = []
+        prediction = k_nearest_neighbors(X_edited, y_edited, [X_train[i]], k, regression=regression)[0]
 
-        for i, x in enumerate(X_train):
-            # Use k-NN to predict the label of each example
-            neighbors = np.argsort([euclidean_distance(x, x_train) for x_train in X_train if x_train != x])[:self.k]
-            k_nearest_labels = [y_train[j] for j in neighbors]
-            predicted_label = Counter(k_nearest_labels).most_common(1)[0][0]
-
-            # If prediction is close enough to the true label, keep the example
-            if abs(predicted_label - y_train[i]) < self.threshold:
-                X_cleaned.append(x)
-                y_cleaned.append(y_train[i])
-
-        return X_cleaned, y_cleaned
-
-
-class KMeans:
-    def __init__(self, k_clusters=3, max_iters=100):
-        self.k_clusters = k_clusters
-        self.max_iters = max_iters
-
-    def fit(self, X):
-        # Convert X to a NumPy array if it isn't already
-        X = np.array(X)
-
-        # Randomly initialize centroids from the dataset
-        self.centroids = X[np.random.choice(X.shape[0], self.k_clusters, replace=False)]
-
-        for _ in range(self.max_iters):
-            # Assign clusters
-            clusters = self._assign_clusters(X)
-            # Recompute centroids
-            new_centroids = self._compute_centroids(X, clusters)
-            # Compare centroids using np.array_equal
-            if np.array_equal(new_centroids, self.centroids):
-                break
-            self.centroids = new_centroids
-        return self.centroids
-
-    def _assign_clusters(self, X):
-        clusters = []
-        for x in X:
-            distances = [euclidean_distance(x, centroid) for centroid in self.centroids]
-            clusters.append(np.argmin(distances))
-        return clusters
-
-    def _compute_centroids(self, X, clusters):
-        return [np.mean([X[i] for i in range(len(X)) if clusters[i] == cluster], axis=0) for cluster in range(self.k_clusters)]
-
-
-def gaussian_kernel(distance, sigma=1.0):
-    return math.exp(-distance**2 / (2 * sigma**2))
-
-
-class KNNWithRBF(KNN):
-    def __init__(self, k=3, sigma=1.0):
-        super().__init__(k)
-        self.sigma = sigma
-
-    def _predict(self, x, task):
-        distances = [euclidean_distance(x, x_train) for x_train in self.X_train]
-        k_indices = np.argsort(distances)[:self.k]
-        k_nearest_labels = [self.y_train[i] for i in k_indices]
-
-        if task == "classification":
-            return Counter(k_nearest_labels).most_common(1)[0][0]
+        if regression:
+            # Check if the error is within the threshold for regression
+            if abs(prediction - y_train[i]) <= error_threshold:
+                edited_X.append(X_train[i])
+                edited_y.append(y_train[i])
         else:
-            weights = [gaussian_kernel(distances[i], self.sigma) for i in k_indices]
-            return np.dot(k_nearest_labels, weights) / np.sum(weights)
+            # Keep the point if correctly classified for classification tasks
+            if prediction == y_train[i]:
+                edited_X.append(X_train[i])
+                edited_y.append(y_train[i])
+
+    return np.array(edited_X), np.array(edited_y)
 
 
-# Example usage of k-NN
-if __name__ == "__main__":
-    # Dummy data (simple 2D points)
-    X_train = [[2, 3], [3, 5], [5, 8], [7, 7], [8, 10]]
-    y_train_class = [0, 1, 1, 0, 1]  # Classification labels
-    y_train_reg = [2.5, 3.6, 4.2, 5.8, 6.1]  # Regression values
+def kmeans_clustering(X, num_clusters, max_iterations=100):
+    """
+    Apply k-means clustering to the data and return cluster centroids as a reduced dataset.
+    """
+    np.random.seed(42)
+    centroids = X[np.random.choice(len(X), num_clusters, replace=False)]
 
-    knn = KNN(k=3)
+    for _ in range(max_iterations):
+        clusters = [[] for _ in range(num_clusters)]
 
-    # Classification example
-    knn.fit(X_train, y_train_class)
-    X_test = [[6, 7], [5, 6],[4,3]]
-    print("Classification Predictions:", knn.predict(X_test, task="classification"))
+        # Assign each data point to the closest centroid
+        for point in X:
+            distances = [euclidean_distance_optimized(point, centroid) for centroid in centroids]
+            closest_centroid_idx = np.argmin(distances)
+            clusters[closest_centroid_idx].append(point)
 
-    # Regression example
-    knn.fit(X_train, y_train_reg)
-    print("Regression Predictions:", knn.predict(X_test, task="regression"))
+        new_centroids = [np.mean(cluster, axis=0) if len(cluster) > 0 else centroids[i]
+                         for i, cluster in enumerate(clusters)]
 
+        if np.allclose(centroids, new_centroids, atol=1e-6):
+            break
 
-# Example usage of Edited k-NN
-if __name__ == "__main__":
-    enn = EditedKNN(k=3, threshold=0.1)
+        centroids = new_centroids
 
-    # Classification example
-    enn.fit(X_train, y_train_class)
-    print("Edited k-NN Classification Predictions:", enn.predict(X_test, task="classification"))
+    return np.array(centroids)
 
-    # Regression example
-    enn.fit(X_train, y_train_reg)
-    print("Edited k-NN Regression Predictions:", enn.predict(X_test, task="regression"))
-
-
-# Example usage of k-Means
-if __name__ == "__main__":
-    kmeans = KMeans(k_clusters=3)
-    centroids = kmeans.fit(X_train)
-    print("Centroids from k-Means:", centroids)
-
-
-# Example usage for regression with RBF
-if __name__ == "__main__":
-    knn_rbf = KNNWithRBF(k=3, sigma=1.0)
-    knn_rbf.fit(X_train, y_train_reg)
-    print("RBF Regression Predictions:", knn_rbf.predict(X_test, task="regression"))

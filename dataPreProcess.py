@@ -1,172 +1,124 @@
 import numpy as np
 import pandas as pd
-
-class dataPreProcess(object):
-
-
-    def __init__(self):
-        X = None
-        y = None
-        tuningArray = None
+import multiprocessing as mp
+from KNN import k_nearest_neighbors, edited_knn
 
 
-    def getData(self, filePath):
+def dataPreProcess(file_path, normalize_y=True):
+    """
+    Load and preprocess data from a CSV file, handling missing values and
+    converting categorical features to numeric ones using factorization.
+    Optionally normalize target values y.
+    """
+    # Load data into a pandas DataFrame
+    data = pd.read_csv(file_path, header=None)
 
-        data = pd.read_csv(filePath, header = None)
+    # Process each column (Handle categorical features)
+    for row, element in enumerate(data.iloc[0]):
+        if isinstance(element, str):  # If the element is a string (categorical data)
+            data[row] = pd.factorize(data[row])[0]  # Convert the entire column to numeric (factorize)
 
-        for row, element in enumerate(data.iloc[0]):                 # go through all the first row of data
+    # Fill missing values (for numeric columns)
+    data.fillna(data.mean(numeric_only=True).round(0), inplace=True)  # Replace missing numeric values with the mean
 
-            if(isinstance(element, str)):                            # if the element is a string or subclass of string
-                data[row] = pd.factorize(data[row])[0]               # we will make the entire column into 0s (ex {'a', 'b', 'c', 'a'} -> {0, 1, 2, 0})
+    # Shuffle the data
+    data = data.sample(frac=1).reset_index(drop=True)  # Shuffle the data
 
-        X = pd.DataFrame(data)
+    # Split into features (X) and labels (y)
+    X = data.iloc[:, :-1].values  # All columns except the last one (features)
+    y = data.iloc[:, -1].values   # The last column contains labels/targets
 
-        X = X.sample(frac = 1)                                      # shuffle the data
+    # Normalize the target values if requested
+    if normalize_y:
+        y = (y - np.min(y)) / (np.max(y) - np.min(y))  # Normalize to [0, 1]
 
-        y = X[X.columns[-1]]                                        # move labels to y
-        X.drop([X.columns[-1]], axis = 1, inplace = True)           # remove labels from X
+    # Standardize the features: Only divide by std if std != 0
+    means = np.mean(X, axis=0)
+    stds = np.std(X, axis=0)
+    stds[stds == 0] = 1  # Replace 0 std with 1 to avoid division by zero
+    X = (X - means) / stds
 
-        X = X.to_numpy()
-        y = y.to_numpy()
-        return X,y
-
-
-    def stratify(self, X, y, regression=False, tuningParition=True, tuningArray=None):
-
-
-        
-
-        if(not regression):
-            if(tuningParition):
-                X = np.array_split(X,10)                                 # evenly splits the data into ten partitions (1 less normal partition for tuning partition)
-                y = np.array_split(y,10)
-                tuningArray = [X[9],y[9]]                                # makes tuningPartition instead of tenth partition
-           
-            else:
-                X = np.array_split(X,10)                                 # evenly splits the data into ten partitions
-                y = np.array_split(y,10)
-        
-        else:                                                            #is regression
-            
-            X = np.hstack((X,y[:, None]))  
-            t = X[1]                                      #re-add the response data to last column
-            print(t)
-            print(X)
-            X = X[X[:, -1].argsort()]                                          #sort the data by the last column (sort data by response)
-            print(X)
-            numRows, numCols = X.shape
-            numCols -= 1
-            newXArr = np.array([[np.empty((numCols))],[np.empty((numCols))],[np.empty((numCols))],[np.empty((numCols))],[np.empty((numCols))],[np.empty((numCols))],[np.empty((numCols))],[np.empty((numCols))],[np.empty((numCols))],[np.empty((numCols))]])                        # make an empty array that will be used for the 10 data points
-            newYArr = np.array([[np.empty((1))],[np.empty((1))],[np.empty((1))],[np.empty((1))],[np.empty((1))],[np.empty((1))],[np.empty((1))],[np.empty((1))],[np.empty((1))],[np.empty((1))]])                        # make an empty array that will be used for the 10 data points
-
-            #I tried the way above but no matter what I did i would get a error when I would try to vstack inside the array (when I would newYArr[count] = np.vstack((newYArr[count], newY[row]))) i spent more then 3 hours on it best to move
-
-            Y1,Y2,Y3,Y4,Y5,Y6,Y7,Y8,Y9,Y10 = np.empty((1)),np.empty((1)),np.empty((1)),np.empty((1)),np.empty((1)),np.empty((1)),np.empty((1)),np.empty((1)),np.empty((1)),np.empty((1))
-            X1,X2,X3,X4,X5,X6,X7,X8,X9,X10 = np.empty((numCols)),np.empty((numCols)),np.empty((numCols)),np.empty((numCols)),np.empty((numCols)),np.empty((numCols)),np.empty((numCols)),np.empty((numCols)),np.empty((numCols)),np.empty((numCols))
-
-            tempX = np.split(X, np.where(np.diff(X[:,-1]))[0]+1)          #splits the data when the response info changes(i.e. a new response type) | returns a list of np arrays
-            
-            lenX = len(newXArr)                                             #number of groups of different response
-            
-            count = 0
-            
-            first = True
-            
-            for tempVal, array in enumerate(tempX):
-                
-                arrayRow, tempArrY = array.shape
-                newX = array
-                newY, newX = newX[:,-1], np.delete(newX, -1, axis=1)                                 # move labels to y
-                
-                
+    return X, y
 
 
-                for row in range(arrayRow):
-                    
+def stratified_k_fold_cross_validation(X, y, num_folds=10, regression=False):
+    """
+    Perform stratified 10-fold cross-validation.
+    For regression, the data is stratified by sorting based on the target values.
+    """
+    data = np.column_stack((X, y))
+    if regression:
+        data = data[data[:, -1].argsort()]  # Sort by the target values
 
-                    if (count % 10 == 0) and (count != 0):                                  #If count is a multiple of ten
-                       
-                        count = 0
-                        
-                        if(first):
-                            
-                            first = False
-                    
-                    if(first):
-                        match count:
-                            case 1:
-                                Y1 = newY[row]
-                                X1 = newX[row]
-                            case 2:
-                                Y2 = newY[row]
-                                X2 = newX[row]
-                            case 3:
-                                Y3 = newY[row]
-                                X3 = newX[row]
-                            case 4:
-                                Y4 = newY[row]
-                                X4 = newX[row]    
-                            case 5:
-                                Y5 = newY[row]
-                                X5 = newX[row]
-                            case 6:
-                                Y6 = newY[row]
-                                X6 = newX[row]
-                            case 7:
-                                Y7 = newY[row]
-                                X7 = newX[row]
-                            case 8:
-                                Y8 = newY[row]
-                                X8 = newX[row]
-                            case 9:
-                                Y9 = newY[row]
-                                X9 = newX[row]
-                            case 10:
-                                Y10 = newY[row]
-                                X10 = newX[row]
-                                                       #change the first value to row
+    fold_size = len(X) // num_folds
+    folds = []
 
-                        
-                    
-                    else:
-                        testY = np.vstack((newYArr[count], newY[row]))
-                        match count:
-                            case 1:
-                                Y1 = np.vstack((Y1, newY[row]))
-                                X1 = np.vstack((X1, newX[row]))
-                            case 2:
-                                Y2 = np.vstack((Y2, newY[row]))
-                                X2 = np.vstack((X2, newX[row]))
-                            case 3:
-                                Y3 = np.vstack((Y3, newY[row]))
-                                X3 = np.vstack((X3, newX[row]))
-                            case 4:
-                                Y4 = np.vstack((Y4, newY[row]))
-                                X4 = np.vstack((X4, newX[row]))    
-                            case 5:
-                                Y5 = np.vstack((Y5, newY[row]))
-                                X5 = np.vstack((X5, newX[row]))
-                            case 6:
-                                Y6 = np.vstack((Y6, newY[row]))
-                                X6 = np.vstack((X6, newX[row]))
-                            case 7:
-                                Y7 = np.vstack((Y7, newY[row]))
-                                X7 = np.vstack((X7, newX[row]))
-                            case 8:
-                                Y8 = np.vstack((Y8, newY[row]))
-                                X8 = np.vstack((X8, newX[row]))
-                            case 9:
-                                Y9 = np.vstack((Y9, newY[row]))
-                                X9 = np.vstack((X9, newX[row]))
-                            case 10:
-                                Y10 = np.vstack((Y10, newY[row]))
-                                X10 = np.vstack((X10, newX[row]))
-                
-                    count += 1
-            X = np.array((X1,X2,X3,X4,X5,X6,X7,X8,X9,X10), dtype=object)
-            y = np.array((Y1,Y2,Y3,Y4,Y5,Y6,Y7,Y8,Y9,Y10), dtype=object)
+    for i in range(num_folds):
+        fold = data[i::num_folds]
+        folds.append(fold)
 
-        return X, y
+    return folds
 
 
-            
+def process_fold(fold_data):
+    """Function to process a single fold of cross-validation."""
+    X_train, y_train, X_test, y_test, k, regression, sigma, error_threshold = fold_data
+
+    # Ensure sigma is not None for regression
+    if regression and sigma is None:
+        sigma = 1.0  # Set a default sigma if not provided
+
+    # Apply Edited k-NN on training set
+    X_train_edited, y_train_edited = edited_knn(X_train, y_train, k, regression=regression, error_threshold=error_threshold)
+
+    # Run k-NN on the edited training set
+    predictions = k_nearest_neighbors(X_train_edited, y_train_edited, X_test, k, regression=regression, sigma=sigma)
+
+    # Calculate performance
+    if regression:
+        performance = np.mean((predictions - y_test) ** 2)
+    else:
+        performance = np.mean(predictions == y_test)
+
+    return performance
+
+
+def cross_validate_manual(X, y, k_values, num_folds=10, regression=False, sigma=None, error_threshold=None):
+    """
+    Perform manual 10-fold cross-validation with stratified splits and Edited k-NN, in parallel.
+    """
+    # Stratified k-fold split
+    folds = stratified_k_fold_cross_validation(X, y, num_folds=num_folds, regression=regression)
+
+    best_k = None
+    best_performance = float('inf') if regression else 0
+
+    for k in k_values:
+        # Prepare fold data for multiprocessing
+        fold_data = []
+        for i in range(num_folds):
+            test_set = folds[i]
+            train_set = np.concatenate(folds[:i] + folds[i+1:])
+
+            X_train, y_train = train_set[:, :-1], train_set[:, -1]
+            X_test, y_test = test_set[:, :-1], test_set[:, -1]
+
+            fold_data.append((X_train, y_train, X_test, y_test, k, regression, sigma, error_threshold))
+
+        # Use multiprocessing to parallelize fold processing
+        with mp.Pool(mp.cpu_count()) as pool:
+            performances = pool.map(process_fold, fold_data)
+
+        avg_performance = np.mean(performances)
+        print(f"Average performance for k={k}: {avg_performance}")
+
+        if (regression and avg_performance < best_performance) or (not regression and avg_performance > best_performance):
+            best_performance = avg_performance
+            best_k = k
+
+    # Ensure best_k is valid
+    if best_k is None:
+        raise ValueError("Failed to determine the best k. Check data preprocessing and model logic.")
+
+    return best_k
+
