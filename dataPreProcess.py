@@ -1,39 +1,124 @@
 import numpy as np
 import pandas as pd
-
-class dataPreProcess:
-
-    def __init__(self):
-        X = None
-        y = None
-        tuningArray = None
+import multiprocessing as mp
+from KNN import k_nearest_neighbors, edited_knn
 
 
-    def getData(filePath):
+def dataPreProcess(file_path, normalize_y=True):
+    """
+    Load and preprocess data from a CSV file, handling missing values and
+    converting categorical features to numeric ones using factorization.
+    Optionally normalize target values y.
+    """
+    # Load data into a pandas DataFrame
+    data = pd.read_csv(file_path, header=None)
 
-        data = pd.read_csv(filePath, header = None)
+    # Process each column (Handle categorical features)
+    for row, element in enumerate(data.iloc[0]):
+        if isinstance(element, str):  # If the element is a string (categorical data)
+            data[row] = pd.factorize(data[row])[0]  # Convert the entire column to numeric (factorize)
 
-        for row, element in enumerate(data.iloc[0]):                 # go through all the first row of data
+    # Fill missing values (for numeric columns)
+    data.fillna(data.mean(numeric_only=True).round(0), inplace=True)  # Replace missing numeric values with the mean
 
-            if(isinstance(element, str)):                            # if the element is a string or subclass of string
-                data[row] = pd.factorize(data[row])[0]               # we will make the entire column into 0s (ex {'a', 'b', 'c', 'a'} -> {0, 1, 2, 0})
+    # Shuffle the data
+    data = data.sample(frac=1).reset_index(drop=True)  # Shuffle the data
 
-        X = pd.DataFrame(data)
+    # Split into features (X) and labels (y)
+    X = data.iloc[:, :-1].values  # All columns except the last one (features)
+    y = data.iloc[:, -1].values   # The last column contains labels/targets
 
-        X = X.sample(frac = 1)                                      # shuffle the data
+    # Normalize the target values if requested
+    if normalize_y:
+        y = (y - np.min(y)) / (np.max(y) - np.min(y))  # Normalize to [0, 1]
 
-        y = X[X.columns[-1]]                                        # move labels to y
-        X.drop([X.columns[-1]], axis = 1, inplace = True)           # remove labels from X
+    # Standardize the features: Only divide by std if std != 0
+    means = np.mean(X, axis=0)
+    stds = np.std(X, axis=0)
+    stds[stds == 0] = 1  # Replace 0 std with 1 to avoid division by zero
+    X = (X - means) / stds
 
-        return X, y
+    return X, y
 
 
-    def stratify(X, y, regression=False, tuningParition=True, tuningArray=None):
+def stratified_k_fold_cross_validation(X, y, num_folds=10, regression=False):
+    """
+    Perform stratified 10-fold cross-validation.
+    For regression, the data is stratified by sorting based on the target values.
+    """
+    data = np.column_stack((X, y))
+    if regression:
+        data = data[data[:, -1].argsort()]  # Sort by the target values
 
-        if(tuningParition):
-            np.array_split(X,10)                                     # evenly splits the data into ten partitions (1 less normal partition for tuning partition)
-            np.array_split(y,10)
-            tuningArray = [X[9],y[9]]                                # makes tuningPartition instead of tenth partition
-        else:
-            np.array_split(X,10)                                     # evenly splits the data into ten partitions
-            np.array_split(y,10)
+    fold_size = len(X) // num_folds
+    folds = []
+
+    for i in range(num_folds):
+        fold = data[i::num_folds]
+        folds.append(fold)
+
+    return folds
+
+
+def process_fold(fold_data):
+    """Function to process a single fold of cross-validation."""
+    X_train, y_train, X_test, y_test, k, regression, sigma, error_threshold = fold_data
+
+    # Ensure sigma is not None for regression
+    if regression and sigma is None:
+        sigma = 1.0  # Set a default sigma if not provided
+
+    # Apply Edited k-NN on training set
+    X_train_edited, y_train_edited = edited_knn(X_train, y_train, k, regression=regression, error_threshold=error_threshold)
+
+    # Run k-NN on the edited training set
+    predictions = k_nearest_neighbors(X_train_edited, y_train_edited, X_test, k, regression=regression, sigma=sigma)
+
+    # Calculate performance
+    if regression:
+        performance = np.mean((predictions - y_test) ** 2)
+    else:
+        performance = np.mean(predictions == y_test)
+
+    return performance
+
+
+def cross_validate_manual(X, y, k_values, num_folds=10, regression=False, sigma=None, error_threshold=None):
+    """
+    Perform manual 10-fold cross-validation with stratified splits and Edited k-NN, in parallel.
+    """
+    # Stratified k-fold split
+    folds = stratified_k_fold_cross_validation(X, y, num_folds=num_folds, regression=regression)
+
+    best_k = None
+    best_performance = float('inf') if regression else 0
+
+    for k in k_values:
+        # Prepare fold data for multiprocessing
+        fold_data = []
+        for i in range(num_folds):
+            test_set = folds[i]
+            train_set = np.concatenate(folds[:i] + folds[i+1:])
+
+            X_train, y_train = train_set[:, :-1], train_set[:, -1]
+            X_test, y_test = test_set[:, :-1], test_set[:, -1]
+
+            fold_data.append((X_train, y_train, X_test, y_test, k, regression, sigma, error_threshold))
+
+        # Use multiprocessing to parallelize fold processing
+        with mp.Pool(mp.cpu_count()) as pool:
+            performances = pool.map(process_fold, fold_data)
+
+        avg_performance = np.mean(performances)
+        print(f"Average performance for k={k}: {avg_performance}")
+
+        if (regression and avg_performance < best_performance) or (not regression and avg_performance > best_performance):
+            best_performance = avg_performance
+            best_k = k
+
+    # Ensure best_k is valid
+    if best_k is None:
+        raise ValueError("Failed to determine the best k. Check data preprocessing and model logic.")
+
+    return best_k
+

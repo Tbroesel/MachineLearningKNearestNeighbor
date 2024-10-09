@@ -1,7 +1,6 @@
-import numpy as np
 import pandas as pd
 
-t = pd.read_csv(r"C:\Users\tyler\OneDrive\Documents\GitHub\MachineLearningKNearestNeighbor\data\forestfires.data", header=None)
+t = pd.read_csv(r"C:\Users\camde\IdeaProjects\MachineLearningKNearestNeighbor\data\glass.data", header=None)
 print(t)
 
 for row, element in enumerate(t.iloc[0]):
