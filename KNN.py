@@ -131,7 +131,7 @@ if __name__ == "__main__":
 
     # Classification example
     knn.fit(X_train, y_train_class)
-    X_test = [[6, 7], [5, 6]]
+    X_test = [[6, 7], [5, 6],[4,3]]
     print("Classification Predictions:", knn.predict(X_test, task="classification"))
 
     # Regression example
