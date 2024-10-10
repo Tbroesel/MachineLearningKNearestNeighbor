@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import multiprocessing as mp
 from KNN import k_nearest_neighbors, edited_knn
+import matplotlib.pyplot as plt
 
 
 def dataPreProcess(file_path, normalize_y=True):
@@ -37,6 +38,15 @@ def dataPreProcess(file_path, normalize_y=True):
     stds = np.std(X, axis=0)
     stds[stds == 0] = 1  # Replace 0 std with 1 to avoid division by zero
     X = (X - means) / stds
+
+    rowCount = 0
+    for row, element in enumerate(data.iloc[0]):
+        rowCount+=1
+    for count in range(rowCount):
+        plt.scatter(data.iloc[:, count], data.iloc[:, -1], alpha=0.5)
+        plt.show()
+    
+
 
     return X, y
 
@@ -91,34 +101,64 @@ def cross_validate_manual(X, y, k_values, num_folds=10, regression=False, sigma=
     folds = stratified_k_fold_cross_validation(X, y, num_folds=num_folds, regression=regression)
 
     best_k = None
+    best_sigma = None
     best_performance = float('inf') if regression else 0
 
-    for k in k_values:
-        # Prepare fold data for multiprocessing
-        fold_data = []
-        for i in range(num_folds):
-            test_set = folds[i]
-            train_set = np.concatenate(folds[:i] + folds[i+1:])
+    if sigma != None:
 
-            X_train, y_train = train_set[:, :-1], train_set[:, -1]
-            X_test, y_test = test_set[:, :-1], test_set[:, -1]
+        for k in k_values:
+            for s in sigma:
+                # Prepare fold data for multiprocessing
+                fold_data = []
+                for i in range(num_folds):
+                    test_set = folds[i]
+                    train_set = np.concatenate(folds[:i] + folds[i+1:])
 
-            fold_data.append((X_train, y_train, X_test, y_test, k, regression, sigma, error_threshold))
+                    X_train, y_train = train_set[:, :-1], train_set[:, -1]
+                    X_test, y_test = test_set[:, :-1], test_set[:, -1]
 
-        # Use multiprocessing to parallelize fold processing
-        with mp.Pool(mp.cpu_count()) as pool:
-            performances = pool.map(process_fold, fold_data)
+                    fold_data.append((X_train, y_train, X_test, y_test, k, regression, s, error_threshold))
 
-        avg_performance = np.mean(performances)
-        print(f"Average performance for k={k}: {avg_performance}")
+                # Use multiprocessing to parallelize fold processing
+                with mp.Pool(mp.cpu_count()) as pool:
+                    performances = pool.map(process_fold, fold_data)
 
-        if (regression and avg_performance < best_performance) or (not regression and avg_performance > best_performance):
-            best_performance = avg_performance
-            best_k = k
+                avg_performance = np.mean(performances)
+                print(f"Average performance for k={k} & s={s}: {avg_performance}")
+
+                if (regression and avg_performance < best_performance) or (not regression and avg_performance > best_performance):
+                    best_performance = avg_performance
+                    best_k = k
+                    best_sigma = s
+    else:
+        for k in k_values:
+                # Prepare fold data for multiprocessing
+                fold_data = []
+                for i in range(num_folds):
+                    test_set = folds[i]
+                    train_set = np.concatenate(folds[:i] + folds[i+1:])
+
+                    X_train, y_train = train_set[:, :-1], train_set[:, -1]
+                    X_test, y_test = test_set[:, :-1], test_set[:, -1]
+
+                    fold_data.append((X_train, y_train, X_test, y_test, k, regression, None , error_threshold))
+
+                # Use multiprocessing to parallelize fold processing
+                with mp.Pool(mp.cpu_count()) as pool:
+                    performances = pool.map(process_fold, fold_data)
+
+                avg_performance = np.mean(performances)
+                print(f"Average performance for k={k}: {avg_performance}")
+
+                if (regression and avg_performance < best_performance) or (not regression and avg_performance > best_performance):
+                    best_performance = avg_performance
+                    best_k = k
 
     # Ensure best_k is valid
     if best_k is None:
         raise ValueError("Failed to determine the best k. Check data preprocessing and model logic.")
+    if best_sigma is None:
+        raise ValueError("Failed to determine the best k. Check data preprocessing and model logic.")
 
-    return best_k
+    return best_k, best_sigma
 
