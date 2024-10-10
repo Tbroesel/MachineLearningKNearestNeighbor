@@ -13,7 +13,7 @@ def dataPreProcess(file_path, normalize_y=True):
     """
     # Load data into a pandas DataFrame
     data = pd.read_csv(file_path, header=None)
-
+    
     # Process each column (Handle categorical features)
     for row, element in enumerate(data.iloc[0]):
         if isinstance(element, str):  # If the element is a string (categorical data)
@@ -42,9 +42,9 @@ def dataPreProcess(file_path, normalize_y=True):
     rowCount = 0
     for row, element in enumerate(data.iloc[0]):
         rowCount+=1
-    for count in range(rowCount):
-        plt.scatter(data.iloc[:, count], data.iloc[:, -1], alpha=0.5)
-        plt.show()
+    #for count in range(rowCount):
+    #    plt.scatter(data.iloc[:, count], data.iloc[:, -1], alpha=0.5)
+    #    plt.show()
     
 
 
@@ -104,8 +104,12 @@ def cross_validate_manual(X, y, k_values, num_folds=10, regression=False, sigma=
     best_sigma = None
     best_performance = float('inf') if regression else 0
 
-    if sigma != None:
+    avg_performance_list = []
+    whenK = []
+    whenS = []
 
+    if sigma != None:
+        
         for k in k_values:
             for s in sigma:
                 # Prepare fold data for multiprocessing
@@ -123,13 +127,22 @@ def cross_validate_manual(X, y, k_values, num_folds=10, regression=False, sigma=
                 with mp.Pool(mp.cpu_count()) as pool:
                     performances = pool.map(process_fold, fold_data)
 
+                
+                
+                
                 avg_performance = np.mean(performances)
+                avg_performance_list.append(avg_performance)
+                whenK.append(k)
+                whenS.append(s)
                 print(f"Average performance for k={k} & s={s}: {avg_performance}")
-
+                
                 if (regression and avg_performance < best_performance) or (not regression and avg_performance > best_performance):
                     best_performance = avg_performance
                     best_k = k
                     best_sigma = s
+        plt.plot(whenK, avg_performance_list, label="K perfomance",figure="K")
+        plt.plot(whenS, avg_performance_list, label="sigma perfomance")
+        plt.show()
     else:
         for k in k_values:
                 # Prepare fold data for multiprocessing
