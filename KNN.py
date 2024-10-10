@@ -1,6 +1,5 @@
 import numpy as np
 
-
 def euclidean_distance_optimized(X_train, X_test):
     """
     Vectorized computation of Euclidean distances between training and test points.
