@@ -121,7 +121,8 @@ def cross_validate_manual(X, y, k_values, num_folds=10, regression=False, sigma=
                     X_train, y_train = train_set[:, :-1], train_set[:, -1]
                     X_test, y_test = test_set[:, :-1], test_set[:, -1]
 
-                    fold_data.append((X_train, y_train, X_test, y_test, k, regression, s, error_threshold))
+                    fold_data.append((X_train, y_train, X_test, y_test, int(k), regression, s, error_threshold))
+
 
                 # Use multiprocessing to parallelize fold processing
                 with mp.Pool(mp.cpu_count()) as pool:
@@ -135,7 +136,7 @@ def cross_validate_manual(X, y, k_values, num_folds=10, regression=False, sigma=
                 
                 if (regression and avg_performance < best_performance) or (not regression and avg_performance > best_performance):
                     best_performance = avg_performance
-                    best_k = k
+                    best_k = int(k)
                     best_sigma = s
 
         whenS, newPerformList = zip(*sorted(zip(whenS, avg_performance_list)))
@@ -170,7 +171,7 @@ def cross_validate_manual(X, y, k_values, num_folds=10, regression=False, sigma=
                 
                 if (regression and avg_performance < best_performance) or (not regression and avg_performance > best_performance):
                     best_performance = avg_performance
-                    best_k = k
+                    best_k = int(k)
         plt.plot(whenK, avg_performance_list, '-o')
         plt.xticks(np.arange(1, 11, step=2))
         plt.show()
@@ -178,7 +179,9 @@ def cross_validate_manual(X, y, k_values, num_folds=10, regression=False, sigma=
     # Ensure best_k is valid
     if best_k is None:
         raise ValueError("Failed to determine the best k. Check data preprocessing and model logic.")
-    
 
-    return best_k, best_sigma
+    if regression:
+        return best_k, best_sigma
+    else:
+        return best_k, best_sigma
 
