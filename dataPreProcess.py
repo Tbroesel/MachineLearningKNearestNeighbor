@@ -107,7 +107,9 @@ def cross_validate_manual(X, y, k_values, num_folds=10, regression=False, sigma=
     avg_performance_list = []
     whenK = []
     whenS = []
-
+ 
+    rowNum = 0
+    colNum = 0
     if sigma != None:
         
         for k in k_values:
@@ -131,7 +133,7 @@ def cross_validate_manual(X, y, k_values, num_folds=10, regression=False, sigma=
                 
                 
                 avg_performance = np.mean(performances)
-                avg_performance_list.append(avg_performance)
+                avg_performance_list.append(float(avg_performance))
                 whenK.append(k)
                 whenS.append(s)
                 print(f"Average performance for k={k} & s={s}: {avg_performance}")
@@ -140,8 +142,13 @@ def cross_validate_manual(X, y, k_values, num_folds=10, regression=False, sigma=
                     best_performance = avg_performance
                     best_k = k
                     best_sigma = s
-        plt.plot(whenK, avg_performance_list, label="K perfomance",figure="K")
-        plt.plot(whenS, avg_performance_list, label="sigma perfomance")
+
+        whenS, newPerformList = zip(*sorted(zip(whenS, avg_performance_list)))
+        plt.plot(whenK, avg_performance_list, '-o')
+        plt.xticks(np.arange(1, 11, step=2))
+        plt.show()
+        plt.plot(whenS, newPerformList, '-o', color='green')
+        plt.xticks(np.arange(.6, 1.6, step=.2))
         plt.show()
     else:
         for k in k_values:
@@ -163,9 +170,15 @@ def cross_validate_manual(X, y, k_values, num_folds=10, regression=False, sigma=
                 avg_performance = np.mean(performances)
                 print(f"Average performance for k={k}: {avg_performance}")
 
+                avg_performance_list.append(float(avg_performance))
+                whenK.append(k)
+                
                 if (regression and avg_performance < best_performance) or (not regression and avg_performance > best_performance):
                     best_performance = avg_performance
                     best_k = k
+        plt.plot(whenK, avg_performance_list, '-o')
+        plt.xticks(np.arange(1, 11, step=2))
+        plt.show()
 
     # Ensure best_k is valid
     if best_k is None:

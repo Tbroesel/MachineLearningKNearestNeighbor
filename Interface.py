@@ -4,6 +4,7 @@ from KNN import k_nearest_neighbors, edited_knn
 import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
+from scipy.interpolate import make_interp_spline
 
 def main(dataset_path, regression=True):
     # Load and preprocess data
