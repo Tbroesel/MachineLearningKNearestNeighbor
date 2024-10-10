@@ -183,8 +183,7 @@ def cross_validate_manual(X, y, k_values, num_folds=10, regression=False, sigma=
     # Ensure best_k is valid
     if best_k is None:
         raise ValueError("Failed to determine the best k. Check data preprocessing and model logic.")
-    if best_sigma is None:
-        raise ValueError("Failed to determine the best k. Check data preprocessing and model logic.")
+    
 
     return best_k, best_sigma
 

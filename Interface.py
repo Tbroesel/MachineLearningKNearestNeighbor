@@ -6,7 +6,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from scipy.interpolate import make_interp_spline
 
-def main(dataset_path, regression=True):
+def main(dataset_path, regression=False):
     # Load and preprocess data
     X, y = dataPreProcess(dataset_path)
 
@@ -16,10 +16,12 @@ def main(dataset_path, regression=True):
     # Cross-validate and find the best k value using Edited k-NN
     if regression:
         best_k, best_s = cross_validate_manual(X, y, k_values, regression=True, sigma=sigma_values, error_threshold=0.1)
+        print(f"Best k and sigma value: {best_k} with {best_s}")
+
     else:
         best_k = cross_validate_manual(X, y, k_values)
-
-    print(f"Best k and sigma value: {best_k} with {best_s}")
+        print(f"Best k: {best_k}")
+    
 
     # 10-fold stratified cross-validation to report accuracy or MSE for each fold
     folds = stratified_k_fold_cross_validation(X, y, num_folds=10, regression=regression)
@@ -56,6 +58,6 @@ def main(dataset_path, regression=True):
 
 if __name__ == "__main__":
     #dataset_path = r"C:\Users\camde\IdeaProjects\MachineLearningKNearestNeighbor\data\breast-cancer-wisconsin.data"  # Specify the dataset location here
-    dataset_path = r"C:\Users\tyler\OneDrive\Documents\GitHub\MachineLearningKNearestNeighbor\data\breast-cancer-wisconsin.data"
+    dataset_path = r"C:\Users\tyler\OneDrive\Documents\GitHub\MachineLearningKNearestNeighbor\data\glass.data"
     main(dataset_path)
 
