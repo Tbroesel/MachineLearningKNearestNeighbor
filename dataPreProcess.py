@@ -43,10 +43,8 @@ def dataPreProcess(file_path, normalize_y=True):
     for row, element in enumerate(data.iloc[0]):
         rowCount+=1
     #for count in range(rowCount):
-    #    plt.scatter(data.iloc[:, count], data.iloc[:, -1], alpha=0.5)
-    #    plt.show()
-    
-
+        #plt.scatter(data.iloc[:, count], data.iloc[:, -1], alpha=0.5)
+        #plt.show()
 
     return X, y
 
@@ -129,9 +127,6 @@ def cross_validate_manual(X, y, k_values, num_folds=10, regression=False, sigma=
                 with mp.Pool(mp.cpu_count()) as pool:
                     performances = pool.map(process_fold, fold_data)
 
-                
-                
-                
                 avg_performance = np.mean(performances)
                 avg_performance_list.append(float(avg_performance))
                 whenK.append(k)

@@ -1,10 +1,6 @@
-
 from dataPreProcess import dataPreProcess, cross_validate_manual, stratified_k_fold_cross_validation
 from KNN import k_nearest_neighbors, edited_knn
 import numpy as np
-from pathlib import Path
-import matplotlib.pyplot as plt
-from scipy.interpolate import make_interp_spline
 
 def main(dataset_path, regression=False):
     # Load and preprocess data
@@ -52,12 +48,8 @@ def main(dataset_path, regression=False):
     print(f"Final Average = {Avg}")
 
 
-    
-
-
-
 if __name__ == "__main__":
-    #dataset_path = r"C:\Users\camde\IdeaProjects\MachineLearningKNearestNeighbor\data\breast-cancer-wisconsin.data"  # Specify the dataset location here
-    dataset_path = r"C:\Users\tyler\OneDrive\Documents\GitHub\MachineLearningKNearestNeighbor\data\glass.data"
+    dataset_path = r"/Users/camdenroberts/Documents/Files/Fall 24/CSCI447/data/breast-cancer-wisconsin.data"  # Specify the dataset location here
+    #dataset_path = r"C:\Users\tyler\OneDrive\Documents\GitHub\MachineLearningKNearestNeighbor\data\breast-cancer-wisconsin.data"
     main(dataset_path)
 
