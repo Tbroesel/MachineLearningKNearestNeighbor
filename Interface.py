@@ -1,8 +1,8 @@
-from dataPreProcess import dataPreProcess, cross_validate_manual, stratified_k_fold_cross_validation
+from dataPreProcess import dataPreProcess, cross_validate, stratified_k_fold_cross_validation
 from KNN import k_nearest_neighbors, edited_knn
 import numpy as np
 
-def main(dataset_path, regression=False):
+def main(dataset_path, regression=True):
     # Load and preprocess data
     X, y = dataPreProcess(dataset_path)
 
@@ -13,17 +13,13 @@ def main(dataset_path, regression=False):
     # Cross-validate and find the best k value
     if regression:
         # Regression: Expect both best_k and best_sigma
-        best_k, best_sigma = cross_validate_manual(X, y, k_values, regression=True, sigma=sigma_values, error_threshold=0.1)
+        best_k, best_sigma = cross_validate(X, y, k_values, regression=True, sigma=sigma_values, error_threshold=0.1)
         print(f"Best k and sigma value: {best_k} with {best_sigma}")
     else:
         # Classification: Only best_k is returned
-        best_k = cross_validate_manual(X, y, k_values)
+        best_k = cross_validate(X, y, k_values)
         print(f"Best k: {best_k}")
         best_sigma = None  # No sigma for classification
-
-    # Cast best_k to int, ensuring it's not a tuple
-    if isinstance(best_k, tuple):
-        best_k = best_k[0]  # Unpack if it's mistakenly a tuple
 
     # Perform stratified 10-fold cross-validation and evaluation
     folds = stratified_k_fold_cross_validation(X, y, num_folds=10, regression=regression)

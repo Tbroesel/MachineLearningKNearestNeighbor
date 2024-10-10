@@ -91,7 +91,7 @@ def process_fold(fold_data):
     return performance
 
 
-def cross_validate_manual(X, y, k_values, num_folds=10, regression=False, sigma=None, error_threshold=None):
+def cross_validate(X, y, k_values, num_folds=10, regression=False, sigma=None, error_threshold=None):
     """
     Perform manual 10-fold cross-validation with stratified splits and Edited k-NN, in parallel.
     """
@@ -123,7 +123,6 @@ def cross_validate_manual(X, y, k_values, num_folds=10, regression=False, sigma=
 
                     fold_data.append((X_train, y_train, X_test, y_test, int(k), regression, s, error_threshold))
 
-
                 # Use multiprocessing to parallelize fold processing
                 with mp.Pool(mp.cpu_count()) as pool:
                     performances = pool.map(process_fold, fold_data)
@@ -146,6 +145,7 @@ def cross_validate_manual(X, y, k_values, num_folds=10, regression=False, sigma=
         plt.plot(whenS, newPerformList, '-o', color='green')
         plt.xticks(np.arange(.6, 1.6, step=.2))
         plt.show()
+
     else:
         for k in k_values:
                 # Prepare fold data for multiprocessing
@@ -172,6 +172,7 @@ def cross_validate_manual(X, y, k_values, num_folds=10, regression=False, sigma=
                 if (regression and avg_performance < best_performance) or (not regression and avg_performance > best_performance):
                     best_performance = avg_performance
                     best_k = int(k)
+
         plt.plot(whenK, avg_performance_list, '-o')
         plt.xticks(np.arange(1, 11, step=2))
         plt.show()
@@ -183,5 +184,5 @@ def cross_validate_manual(X, y, k_values, num_folds=10, regression=False, sigma=
     if regression:
         return best_k, best_sigma
     else:
-        return best_k, best_sigma
+        return best_k
 
